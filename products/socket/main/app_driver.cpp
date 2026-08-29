@@ -68,6 +68,7 @@ int app_driver_init()
 {
     /* Initialize relay */
     relay_driver_init(RELAY_GPIO_NUM);
+    relay_driver_set_power(RELAY_GPIO_NUM, false);
 
     /* Initialize button */
     button_config_t btn_cfg = {

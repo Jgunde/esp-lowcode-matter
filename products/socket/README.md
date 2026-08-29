@@ -54,6 +54,7 @@ controller with a Thread border router for commissioning.
 The `app_driver_init()` function, called from `setup()` in `app_main.cpp`, performs the following:
 
 * Configures the relay GPIO as output.
+* Drives the relay low during initialization so the socket always starts off.
 * Initializes the button with debounce handling and registers the following callbacks:
   * **Single-click**: Toggles the socket state.
   * **Long-press**: Initiates factory reset.

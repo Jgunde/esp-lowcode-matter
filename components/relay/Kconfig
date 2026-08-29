@@ -1,0 +1,12 @@
+menu "RELAY"
+    choice RELAY_DRIVER_GPIO_SETTINGS
+        prompt "Select HP/LP GPIO for relay output"
+        default RELAY_DRIVER_USE_LP_GPIO
+
+        config RELAY_DRIVER_USE_HP_GPIO
+        bool "Select HP GPIO as relay output"
+
+        config RELAY_DRIVER_USE_LP_GPIO
+        bool "Select LP GPIO as relay output"
+    endchoice
+endmenu
