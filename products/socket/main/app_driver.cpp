@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdio.h>
+#include <soc/gpio_num.h>
 
 #include <system.h>
 #include <low_code.h>
