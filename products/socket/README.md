@@ -1,5 +1,7 @@
 # Socket | 1 Channel
 
+> This product configuration targets the **ESP32-C6_Relay_X1** board.
+
 ## Description
 
 A smart socket featuring relay control, status indication via a single-color LED, and button-based user interactions:
@@ -18,10 +20,10 @@ A smart socket featuring relay control, status indication via a single-color LED
 
 The following hardware components are used for this product:
 
-* **Devkit**: ESP32-C6 development board
-* **Power Relay**: Single-channel relay
-* **Indicator**: Active-high, single-color LED
-* **Button**: On-board or external push-button
+* **Board**: ESP32-C6_Relay_X1
+* **Power Relay**: On-board single-channel relay
+* **Indicator**: On-board active-high, single-color LED
+* **Button**: On-board active-low button
 
 ### Pin Assignment
 
