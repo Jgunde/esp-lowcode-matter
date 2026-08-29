@@ -25,18 +25,15 @@
 #define BUTTON_GPIO_NUM ((gpio_num_t)9)
 #define RELAY_GPIO_NUM ((gpio_num_t)19)
 #define INDICATOR_GPIO_NUM ((gpio_num_t)2)
+#define AUTO_OFF_TIMEOUT_MS 500
 
 static const char *TAG = "app_driver";
 
 static bool socket_state = false;
+static system_timer_handle_t auto_off_timer = NULL;
 
-static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+static void app_driver_report_socket_state()
 {
-    socket_state = !socket_state;
-    printf("%s: Set socket state to %d\n", TAG, socket_state);
-    app_driver_set_socket_state(socket_state);
-
-    /* Update the feature */
     low_code_feature_data_t update_data = {
         .details = {
             .endpoint_id = 1,
@@ -50,6 +47,22 @@ static void app_driver_toggle_socket_state_button_callback(void *arg, void *data
     };
 
     low_code_feature_update_to_system(&update_data);
+}
+
+static void app_driver_auto_off_timer_callback(system_timer_handle_t timer_handle, void *arg)
+{
+    printf("%s: Auto-off timer expired\n", TAG);
+    app_driver_set_socket_state(false);
+    app_driver_report_socket_state();
+}
+
+static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+{
+    socket_state = !socket_state;
+    printf("%s: Set socket state to %d\n", TAG, socket_state);
+    app_driver_set_socket_state(socket_state);
+
+    app_driver_report_socket_state();
 }
 
 static void app_driver_trigger_factory_reset_button_callback(void *arg, void *data)
@@ -70,6 +83,12 @@ int app_driver_init()
     system_set_pin_mode(INDICATOR_GPIO_NUM, OUTPUT);
     system_digital_write(RELAY_GPIO_NUM, LOW);
     system_digital_write(INDICATOR_GPIO_NUM, LOW);
+
+    auto_off_timer = system_timer_create(app_driver_auto_off_timer_callback, NULL, AUTO_OFF_TIMEOUT_MS, false);
+    if (!auto_off_timer) {
+        printf("%s: Failed to create auto-off timer\n", TAG);
+        return -1;
+    }
 
     /* Initialize button */
     button_config_t btn_cfg = {
@@ -100,6 +119,12 @@ int app_driver_set_socket_state(bool state)
     printf("%s: Set socket state to %d\n", TAG, state);
     system_digital_write(RELAY_GPIO_NUM, state ? HIGH : LOW);
     system_digital_write(INDICATOR_GPIO_NUM, state ? HIGH : LOW);
+
+    if (state) {
+        system_timer_start(auto_off_timer);
+    } else {
+        system_timer_stop(auto_off_timer);
+    }
     return 0;
 }
 
