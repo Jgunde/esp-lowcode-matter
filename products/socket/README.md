@@ -68,6 +68,7 @@ The `app_driver_init()` function, called from `setup()` in `app_main.cpp`, perfo
   * `app_driver_toggle_socket_state_button_callback` is invoked on a single-click event.
   * It toggles the socket state using `app_driver_set_socket_state`, updates the LED accordingly, and reports the new state to the system.
   * Every on command starts a 500 ms one-shot timer. When it expires, the relay and LED turn off and the off state is reported to Matter.
+  * Set `AUTO_OFF_TIMEOUT_MS` to `0` in `main/app_driver.cpp` to disable automatic turn-off; the default remains 500 ms.
 
 * **Visual Indicators**:
   * `LOW_CODE_EVENT_SETUP_MODE_START`: turns the indicator on during setup.

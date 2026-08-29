@@ -25,7 +25,7 @@
 #define BUTTON_GPIO_NUM ((gpio_num_t)9)
 #define RELAY_GPIO_NUM ((gpio_num_t)19)
 #define INDICATOR_GPIO_NUM ((gpio_num_t)2)
-#define AUTO_OFF_TIMEOUT_MS 500
+#define AUTO_OFF_TIMEOUT_MS 500 /* Set to 0 to disable automatic turn-off. */
 
 static const char *TAG = "app_driver";
 
@@ -84,10 +84,12 @@ int app_driver_init()
     system_digital_write(RELAY_GPIO_NUM, LOW);
     system_digital_write(INDICATOR_GPIO_NUM, LOW);
 
-    auto_off_timer = system_timer_create(app_driver_auto_off_timer_callback, NULL, AUTO_OFF_TIMEOUT_MS, false);
-    if (!auto_off_timer) {
-        printf("%s: Failed to create auto-off timer\n", TAG);
-        return -1;
+    if (AUTO_OFF_TIMEOUT_MS > 0) {
+        auto_off_timer = system_timer_create(app_driver_auto_off_timer_callback, NULL, AUTO_OFF_TIMEOUT_MS, false);
+        if (!auto_off_timer) {
+            printf("%s: Failed to create auto-off timer\n", TAG);
+            return -1;
+        }
     }
 
     /* Initialize button */
@@ -120,10 +122,12 @@ int app_driver_set_socket_state(bool state)
     system_digital_write(RELAY_GPIO_NUM, state ? HIGH : LOW);
     system_digital_write(INDICATOR_GPIO_NUM, state ? HIGH : LOW);
 
-    if (state) {
-        system_timer_start(auto_off_timer);
-    } else {
-        system_timer_stop(auto_off_timer);
+    if (auto_off_timer) {
+        if (state) {
+            system_timer_start(auto_off_timer);
+        } else {
+            system_timer_stop(auto_off_timer);
+        }
     }
     return 0;
 }
