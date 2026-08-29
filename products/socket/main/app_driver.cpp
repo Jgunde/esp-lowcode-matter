@@ -24,8 +24,8 @@
 #include "app_priv.h"
 
 #define BUTTON_GPIO_NUM ((gpio_num_t)9)
-#define RELAY_GPIO_NUM ((gpio_num_t)2)
-#define INDICATOR_GPIO_NUM ((gpio_num_t)8)
+#define RELAY_GPIO_NUM ((gpio_num_t)19)
+#define INDICATOR_GPIO_NUM ((gpio_num_t)2)
 
 static const char *TAG = "app_driver";
 
@@ -87,13 +87,13 @@ int app_driver_init()
     /* Register callback to factory reset the device on button long press */
     button_driver_register_cb(btn_handle, BUTTON_LONG_PRESS_UP, app_driver_trigger_factory_reset_button_callback, NULL);
 
-    /* Initialise the light indicator */
+    /* Initialise the active-high, single-color light indicator */
     light_driver_config_t cfg = {
-        .device_type = LIGHT_DEVICE_TYPE_WS2812,
-        .channel_comb = LIGHT_CHANNEL_COMB_3CH_RGB,
+        .device_type = LIGHT_DEVICE_TYPE_LED,
+        .channel_comb = LIGHT_CHANNEL_COMB_1CH_C,
         .io_conf = {
-            .ws2812_io = {
-                .ctrl_io = INDICATOR_GPIO_NUM,
+            .led_io = {
+                .cold = INDICATOR_GPIO_NUM,
             },
         },
         .min_brightness = 0,
@@ -122,7 +122,7 @@ int app_driver_event_handler(low_code_event_t *event)
     printf("%s: Received event: %d\n", TAG, event->event_type);
     light_effect_config_t effect_config = {
         .type = LIGHT_EFFECT_INVALID,
-        .mode = LIGHT_WORK_MODE_COLOR, /* Since it is a single channel LED */
+        .mode = LIGHT_WORK_MODE_WHITE, /* The indicator is a single-channel LED */
         .max_brightness = 100,
         .min_brightness = 10
     };

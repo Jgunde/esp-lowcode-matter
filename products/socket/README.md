@@ -2,13 +2,13 @@
 
 ## Description
 
-A smart socket featuring relay control, status indication via a WS2812 RGB LED, and button-based user interactions:
+A smart socket featuring relay control, status indication via a single-color LED, and button-based user interactions:
 
 * **Relay Control**: Controls power via a GPIO-connected relay.
 * **User Input**:
   * Single button press toggles the socket state.
   * Long press triggers a factory reset.
-* **Device Status Indication**: WS2812 RGB LED displays socket state and system events.
+* **Device Status Indication**: An active-high LED displays socket state and system events.
 * **Matter Data Model Specification**:
   * **Device Type** : `On/Off Plug`
 
@@ -20,19 +20,32 @@ The following hardware components are used for this product:
 
 * **Devkit**: ESP32-C6 development board
 * **Power Relay**: Single-channel relay
-* **Indicator**: On-board WS2812 RGB LED
+* **Indicator**: Active-high, single-color LED
 * **Button**: On-board or external push-button
 
 ### Pin Assignment
 
 | Peripheral      | GPIO Pin | Function                |
 |-----------------|----------|-------------------------|
-| Relay Control   | GPIO2    | Main power switching    |
-| Button          | GPIO9    | User input              |
-| RGB LED         | GPIO8    | Status indication       |
+| Relay Control   | GPIO19   | Active-high power switching |
+| Button          | GPIO9    | Active-low user input   |
+| LED             | GPIO2    | Active-high status indication |
 
 > **Note**: GPIO assignments can be customized by modifying the following macros in **app_driver.cpp**:
 > `RELAY_GPIO_NUM`, `BUTTON_GPIO_NUM`, `INDICATOR_GPIO_NUM`
+
+## Matter over Thread Configuration
+
+Select **ESP32-C6 / Thread** when preparing the device. When generating the
+commissioning data from a terminal, pass `thread` as the connection type so the
+Thread data model is used:
+
+```sh
+./tools/mfg/mfg_low_code.sh products/socket esp32c6 <MAC_ADDRESS> thread
+```
+
+The socket is exposed as a Matter On/Off Plug device and requires a Matter
+controller with a Thread border router for commissioning.
 
 ## Understanding Code
 
@@ -44,7 +57,7 @@ The `app_driver_init()` function, called from `setup()` in `app_main.cpp`, perfo
 * Initializes the button with debounce handling and registers the following callbacks:
   * **Single-click**: Toggles the socket state.
   * **Long-press**: Initiates factory reset.
-* Initializes the WS2812 RGB LED for status indication.
+* Initializes the single-color LED for status indication.
 
 ### Core Functions
 
