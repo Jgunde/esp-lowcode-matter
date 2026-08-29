@@ -54,7 +54,7 @@ controller with a Thread border router for commissioning.
 The `app_driver_init()` function, called from `setup()` in `app_main.cpp`, performs the following:
 
 * Configures the relay GPIO as output.
-* Drives the relay low during initialization so the socket always starts off.
+* Configures the relay and LED through the HP GPIO API and drives both low so the socket always starts off.
 * Initializes the button with debounce handling and registers the following callbacks:
   * **Single-click**: Toggles the socket state.
   * **Long-press**: Initiates factory reset.
@@ -67,8 +67,8 @@ The `app_driver_init()` function, called from `setup()` in `app_main.cpp`, perfo
   * It toggles the socket state using `app_driver_set_socket_state`, updates the LED accordingly, and reports the new state to the system.
 
 * **Visual Indicators**:
-  * `LOW_CODE_EVENT_SETUP_MODE_START`: starts blinking effect, to indicate setup mode activation (2000ms interval)
-  * `LOW_CODE_EVENT_SETUP_MODE_END`: stops blinking effect, to indicate setup mode has ended.
+  * `LOW_CODE_EVENT_SETUP_MODE_START`: turns the indicator on during setup.
+  * `LOW_CODE_EVENT_SETUP_MODE_END`: restores the indicator to the socket power state.
   * `LOW_CODE_EVENT_READY`: displays full brightness white light to indicate device is ready
 
 ### Extending Functionality

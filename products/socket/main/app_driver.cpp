@@ -18,8 +18,6 @@
 #include <low_code.h>
 
 #include <button_driver.h>
-#include <relay_driver.h>
-#include <light_driver.h>
 
 #include "app_priv.h"
 
@@ -66,9 +64,11 @@ static void app_driver_trigger_factory_reset_button_callback(void *arg, void *da
 
 int app_driver_init()
 {
-    /* Initialize relay */
-    relay_driver_init(RELAY_GPIO_NUM);
-    relay_driver_set_power(RELAY_GPIO_NUM, false);
+    /* GPIO19 and GPIO2 are HP GPIOs. Configure both through the system HP GPIO API. */
+    system_set_pin_mode(RELAY_GPIO_NUM, OUTPUT);
+    system_set_pin_mode(INDICATOR_GPIO_NUM, OUTPUT);
+    system_digital_write(RELAY_GPIO_NUM, LOW);
+    system_digital_write(INDICATOR_GPIO_NUM, LOW);
 
     /* Initialize button */
     button_config_t btn_cfg = {
@@ -88,21 +88,6 @@ int app_driver_init()
     /* Register callback to factory reset the device on button long press */
     button_driver_register_cb(btn_handle, BUTTON_LONG_PRESS_UP, app_driver_trigger_factory_reset_button_callback, NULL);
 
-    /* Initialise the active-high, single-color light indicator */
-    light_driver_config_t cfg = {
-        .device_type = LIGHT_DEVICE_TYPE_LED,
-        .channel_comb = LIGHT_CHANNEL_COMB_1CH_C,
-        .io_conf = {
-            .led_io = {
-                .cold = INDICATOR_GPIO_NUM,
-            },
-        },
-        .min_brightness = 0,
-        .max_brightness = 100,
-    };
-    light_driver_init(&cfg);
-    light_driver_set_power(socket_state);
-
     printf("%s: App driver initialized\n", TAG);
     return 0;
 }
@@ -112,8 +97,8 @@ int app_driver_set_socket_state(bool state)
     /* Set relay state */
     socket_state = state;
     printf("%s: Set socket state to %d\n", TAG, state);
-    relay_driver_set_power(RELAY_GPIO_NUM, state);
-    light_driver_set_power(state);
+    system_digital_write(RELAY_GPIO_NUM, state ? HIGH : LOW);
+    system_digital_write(INDICATOR_GPIO_NUM, state ? HIGH : LOW);
     return 0;
 }
 
@@ -121,25 +106,15 @@ int app_driver_event_handler(low_code_event_t *event)
 {
     /* Get the events. Approriate indicators should be shown to the user based on the event. */
     printf("%s: Received event: %d\n", TAG, event->event_type);
-    light_effect_config_t effect_config = {
-        .type = LIGHT_EFFECT_INVALID,
-        .mode = LIGHT_WORK_MODE_WHITE, /* The indicator is a single-channel LED */
-        .max_brightness = 100,
-        .min_brightness = 10
-    };
-
     /* Handle the events from low_code_event_type_t */
     switch (event->event_type) {
         case LOW_CODE_EVENT_SETUP_MODE_START:
             printf("%s: Setup mode started\n", TAG);
-            /* Start Indication */
-            effect_config.type = LIGHT_EFFECT_BLINK;
-            light_driver_effect_start(&effect_config, 2000, 120000);
+            system_digital_write(INDICATOR_GPIO_NUM, HIGH);
             break;
         case LOW_CODE_EVENT_SETUP_MODE_END:
             printf("%s: Setup mode ended\n", TAG);
-            /* Stop Indication */
-            light_driver_effect_stop();
+            system_digital_write(INDICATOR_GPIO_NUM, socket_state ? HIGH : LOW);
             break;
         case LOW_CODE_EVENT_SETUP_DEVICE_CONNECTED:
             printf("%s: Device connected during setup\n", TAG);
@@ -167,12 +142,15 @@ int app_driver_event_handler(low_code_event_t *event)
             break;
         case LOW_CODE_EVENT_READY:
             printf("%s: Device is ready\n", TAG);
+            system_digital_write(INDICATOR_GPIO_NUM, socket_state ? HIGH : LOW);
             break;
         case LOW_CODE_EVENT_IDENTIFICATION_START:
             printf("%s: Identification started\n", TAG);
+            system_digital_write(INDICATOR_GPIO_NUM, HIGH);
             break;
         case LOW_CODE_EVENT_IDENTIFICATION_STOP:
             printf("%s: Identification stopped\n", TAG);
+            system_digital_write(INDICATOR_GPIO_NUM, socket_state ? HIGH : LOW);
             break;
         case LOW_CODE_EVENT_TEST_MODE_LOW_CODE:
             printf("%s: Low code test mode is triggered for subtype: %d\n", TAG, (int)*((int*)(event->event_data)));
