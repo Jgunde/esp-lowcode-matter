@@ -15,6 +15,8 @@
 #include <ulp_lp_core_utils.h>
 #include <hal/gpio_ll.h>
 #include <hal/gpio_types.h>
+#include <hal/misc.h>
+#include <soc/lp_aon_struct.h>
 #include <soc/gpio_struct.h>
 #include <soc/gpio_reg.h>
 #include <soc/interrupt_matrix_struct.h>
@@ -98,6 +100,14 @@ void system_enable_software_interrupt()
 
 void system_set_pin_mode(int gpio_num, pin_mode_t mode)
 {
+    /* GPIO0..7 can be routed to LP IO. Return them to the HP digital GPIO
+     * peripheral before applying a normal GPIO configuration. */
+    if (gpio_num >= GPIO_NUM_0 && gpio_num <= GPIO_NUM_7) {
+        uint32_t sel_mask = HAL_FORCE_READ_U32_REG_FIELD(LP_AON.gpio_mux, gpio_mux_sel);
+        sel_mask &= ~BIT(gpio_num);
+        HAL_FORCE_MODIFY_U32_REG_FIELD(LP_AON.gpio_mux, gpio_mux_sel, sel_mask);
+    }
+
     if (mode == OUTPUT) {
         gpio_ll_output_enable(&GPIO, gpio_num);
         gpio_ll_pullup_dis(&GPIO, gpio_num);

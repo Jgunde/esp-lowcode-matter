@@ -1,5 +1,8 @@
 # ESP LowCode: Matter
 
+> **ESP32-C6_Relay_X1 users:** The [single-channel socket example](products/socket/README.md)
+> is configured for this board as a Matter over Thread momentary relay.
+
 ESP LowCode for Matter helps you build [Matter](https://developer.espressif.com/blog/matter/) devices quickly and easily and in a very lightweight way.
 
 This is currently only supported on ESP32-C6. We are working on supporting other ESP32 series as well. Checkout more in [discussions](https://github.com/espressif/esp-lowcode-matter/discussions).

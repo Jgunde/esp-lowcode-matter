@@ -13,31 +13,27 @@
 // limitations under the License.
 
 #include <stdio.h>
+#include <soc/gpio_num.h>
 
 #include <system.h>
 #include <low_code.h>
 
 #include <button_driver.h>
-#include <relay_driver.h>
-#include <light_driver.h>
 
 #include "app_priv.h"
 
 #define BUTTON_GPIO_NUM ((gpio_num_t)9)
-#define RELAY_GPIO_NUM ((gpio_num_t)2)
-#define INDICATOR_GPIO_NUM ((gpio_num_t)8)
+#define RELAY_GPIO_NUM ((gpio_num_t)19)
+#define INDICATOR_GPIO_NUM ((gpio_num_t)2)
+#define AUTO_OFF_TIMEOUT_MS 500 /* Set to 0 to disable automatic turn-off. */
 
 static const char *TAG = "app_driver";
 
 static bool socket_state = false;
+static system_timer_handle_t auto_off_timer = NULL;
 
-static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+static void app_driver_report_socket_state()
 {
-    socket_state = !socket_state;
-    printf("%s: Set socket state to %d\n", TAG, socket_state);
-    app_driver_set_socket_state(socket_state);
-
-    /* Update the feature */
     low_code_feature_data_t update_data = {
         .details = {
             .endpoint_id = 1,
@@ -53,6 +49,22 @@ static void app_driver_toggle_socket_state_button_callback(void *arg, void *data
     low_code_feature_update_to_system(&update_data);
 }
 
+static void app_driver_auto_off_timer_callback(system_timer_handle_t timer_handle, void *arg)
+{
+    printf("%s: Auto-off timer expired\n", TAG);
+    app_driver_set_socket_state(false);
+    app_driver_report_socket_state();
+}
+
+static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+{
+    socket_state = !socket_state;
+    printf("%s: Set socket state to %d\n", TAG, socket_state);
+    app_driver_set_socket_state(socket_state);
+
+    app_driver_report_socket_state();
+}
+
 static void app_driver_trigger_factory_reset_button_callback(void *arg, void *data)
 {
     /* Update by sending event */
@@ -66,8 +78,19 @@ static void app_driver_trigger_factory_reset_button_callback(void *arg, void *da
 
 int app_driver_init()
 {
-    /* Initialize relay */
-    relay_driver_init(RELAY_GPIO_NUM);
+    /* GPIO19 and GPIO2 are HP GPIOs. Configure both through the system HP GPIO API. */
+    system_set_pin_mode(RELAY_GPIO_NUM, OUTPUT);
+    system_set_pin_mode(INDICATOR_GPIO_NUM, OUTPUT);
+    system_digital_write(RELAY_GPIO_NUM, LOW);
+    system_digital_write(INDICATOR_GPIO_NUM, LOW);
+
+    if (AUTO_OFF_TIMEOUT_MS > 0) {
+        auto_off_timer = system_timer_create(app_driver_auto_off_timer_callback, NULL, AUTO_OFF_TIMEOUT_MS, false);
+        if (!auto_off_timer) {
+            printf("%s: Failed to create auto-off timer\n", TAG);
+            return -1;
+        }
+    }
 
     /* Initialize button */
     button_config_t btn_cfg = {
@@ -87,21 +110,6 @@ int app_driver_init()
     /* Register callback to factory reset the device on button long press */
     button_driver_register_cb(btn_handle, BUTTON_LONG_PRESS_UP, app_driver_trigger_factory_reset_button_callback, NULL);
 
-    /* Initialise the light indicator */
-    light_driver_config_t cfg = {
-        .device_type = LIGHT_DEVICE_TYPE_WS2812,
-        .channel_comb = LIGHT_CHANNEL_COMB_3CH_RGB,
-        .io_conf = {
-            .ws2812_io = {
-                .ctrl_io = INDICATOR_GPIO_NUM,
-            },
-        },
-        .min_brightness = 0,
-        .max_brightness = 100,
-    };
-    light_driver_init(&cfg);
-    light_driver_set_power(socket_state);
-
     printf("%s: App driver initialized\n", TAG);
     return 0;
 }
@@ -111,8 +119,16 @@ int app_driver_set_socket_state(bool state)
     /* Set relay state */
     socket_state = state;
     printf("%s: Set socket state to %d\n", TAG, state);
-    relay_driver_set_power(RELAY_GPIO_NUM, state);
-    light_driver_set_power(state);
+    system_digital_write(RELAY_GPIO_NUM, state ? HIGH : LOW);
+    system_digital_write(INDICATOR_GPIO_NUM, state ? HIGH : LOW);
+
+    if (auto_off_timer) {
+        if (state) {
+            system_timer_start(auto_off_timer);
+        } else {
+            system_timer_stop(auto_off_timer);
+        }
+    }
     return 0;
 }
 
@@ -120,25 +136,15 @@ int app_driver_event_handler(low_code_event_t *event)
 {
     /* Get the events. Approriate indicators should be shown to the user based on the event. */
     printf("%s: Received event: %d\n", TAG, event->event_type);
-    light_effect_config_t effect_config = {
-        .type = LIGHT_EFFECT_INVALID,
-        .mode = LIGHT_WORK_MODE_COLOR, /* Since it is a single channel LED */
-        .max_brightness = 100,
-        .min_brightness = 10
-    };
-
     /* Handle the events from low_code_event_type_t */
     switch (event->event_type) {
         case LOW_CODE_EVENT_SETUP_MODE_START:
             printf("%s: Setup mode started\n", TAG);
-            /* Start Indication */
-            effect_config.type = LIGHT_EFFECT_BLINK;
-            light_driver_effect_start(&effect_config, 2000, 120000);
+            system_digital_write(INDICATOR_GPIO_NUM, HIGH);
             break;
         case LOW_CODE_EVENT_SETUP_MODE_END:
             printf("%s: Setup mode ended\n", TAG);
-            /* Stop Indication */
-            light_driver_effect_stop();
+            system_digital_write(INDICATOR_GPIO_NUM, socket_state ? HIGH : LOW);
             break;
         case LOW_CODE_EVENT_SETUP_DEVICE_CONNECTED:
             printf("%s: Device connected during setup\n", TAG);
@@ -166,12 +172,15 @@ int app_driver_event_handler(low_code_event_t *event)
             break;
         case LOW_CODE_EVENT_READY:
             printf("%s: Device is ready\n", TAG);
+            system_digital_write(INDICATOR_GPIO_NUM, socket_state ? HIGH : LOW);
             break;
         case LOW_CODE_EVENT_IDENTIFICATION_START:
             printf("%s: Identification started\n", TAG);
+            system_digital_write(INDICATOR_GPIO_NUM, HIGH);
             break;
         case LOW_CODE_EVENT_IDENTIFICATION_STOP:
             printf("%s: Identification stopped\n", TAG);
+            system_digital_write(INDICATOR_GPIO_NUM, socket_state ? HIGH : LOW);
             break;
         case LOW_CODE_EVENT_TEST_MODE_LOW_CODE:
             printf("%s: Low code test mode is triggered for subtype: %d\n", TAG, (int)*((int*)(event->event_data)));
